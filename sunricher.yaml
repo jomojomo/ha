@@ -1,5 +1,5 @@
 blueprint:
-  name: HK-ZRC-K5&RS-TL
+  name: HK-ZRC-K5RS-TL
   description: |
     Create button-triggered automations for Sunricher HK-ZRC-K5&RS-TL remote control.  
     
