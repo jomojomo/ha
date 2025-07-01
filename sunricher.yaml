@@ -1,0 +1,70 @@
+blueprint:
+  name: HK-ZRC-K5&RS-TL
+  description: |
+    Create button-triggered automations for Sunricher HK-ZRC-K5&RS-TL remote control.  
+    
+    **Features:**  
+    * Supports all 5 buttons: top left/right, bottom left/right, and center  
+    * 4 press types: short press, double press, hold, and release  
+    * Flexible automation actions for each button/press combination  
+    
+    **Use Cases:**  
+    * Control lights and scenes  
+    * Trigger custom automations  
+    * Manage media playback  
+    * And more...  
+    
+  domain: automation
+  input:
+    remote:
+      name: Sunricher remote
+      description: The remote device to use for the automation
+      selector:
+        device:
+          entity:
+            - integration: zha
+          filter:
+            - manufacturer: Sunricher
+              integration: zha
+              model: HK-ZRC-K5&RS-TL
+    button:
+      name: Button
+      description: Select the button to monitor
+      selector:
+        select:
+          options:
+            - top_left
+            - top_right
+            - bottom_left
+            - bottom_right
+            - center
+          custom_value: false
+          multiple: false
+    press_type:
+      name: Press Type
+      description: Select the button trigger type
+      selector:
+        select:
+          options:
+            - short_press
+            - double_press
+            - hold
+            - hold_released
+          custom_value: false
+          multiple: false
+    user_action:
+      name: Custom Action
+      description: Please select the action to execute
+      selector:
+        action: {}
+variables:
+  press_type: !input press_type
+  button: !input button
+  remote: !input remote
+trigger:
+  - trigger: mqtt
+    topic: !input remote
+condition:
+  - "{{ press_type == trigger.payload_json.action }}"
+  - "{{ button in trigger.payload_json.action_buttons }}"
+action: !input user_action
