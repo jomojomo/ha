@@ -1,64 +1,73 @@
 blueprint:
-  name: Sunricher HK-ZRC-K5 - Button Actions
-  description: Handle short press events from the Sunricher HK-ZRC-K5 / RS-TL 5-button remote via ZHA.
+  name: Scene Control Dial (ZHA) + Double & Long Press
+  description: |
+    Control actions from Zigbee scene dial with support for dial turns, button presses, double press and long press on center button.
   domain: automation
   input:
-    remote_device:
-      name: Remote device
-      description: Select the Sunricher device.
-      selector:
-        device:
-          integration: zha
-    button_1_action:
-      name: Button 1
-      description: Action for Button 1 short press
+    centre_press_single_action:
+      name: Centre Button – Single Press
       default: []
       selector:
         action: {}
-    button_2_action:
-      name: Button 2
-      description: Action for Button 2 short press
+    centre_press_double_action:
+      name: Centre Button – Double Press
       default: []
       selector:
         action: {}
-    button_3_action:
-      name: Button 3
-      description: Action for Button 3 short press
+    centre_press_long_action:
+      name: Centre Button – Long Press
       default: []
       selector:
         action: {}
-    button_4_action:
-      name: Button 4
-      description: Action for Button 4 short press
-      default: []
-      selector:
-        action: {}
-    button_5_action:
-      name: Button 5
-      description: Action for Button 5 short press
-      default: []
-      selector:
-        action: {}
+    # You can add others here like before (button_1_action, dial_clockwise_action, etc.)
 
 trigger:
   - platform: event
     event_type: zha_event
 
+variables:
+  ieee: "cc:86:ec:ff:fe:11:2f:63"
+  trigger_data: "{{ trigger.event.data }}"
+  now_ts: "{{ now().timestamp() }}"
+  last_press_ts: "{{ (states('input_datetime.scene_control_last_press') | as_datetime).timestamp() if states('input_datetime.scene_control_last_press') else 0 }}"
+  time_since_last_press: "{{ now_ts - last_press_ts }}"
+
 condition:
   - condition: template
-    value_template: "{{ trigger.event.data.device_id == device_id(remote_device) }}"
+    value_template: "{{ trigger.event.data.device_ieee == ieee }}"
 
 action:
-  - variables:
-      button: "{{ trigger.event.data.command }}"
   - choose:
-      - conditions: "{{ button == 'button_1_press' }}"
-        sequence: !input button_1_action
-      - conditions: "{{ button == 'button_2_press' }}"
-        sequence: !input button_2_action
-      - conditions: "{{ button == 'button_3_press' }}"
-        sequence: !input button_3_action
-      - conditions: "{{ button == 'button_4_press' }}"
-        sequence: !input button_4_action
-      - conditions: "{{ button == 'button_5_press' }}"
-        sequence: !input button_5_action
+      # ============ Centre Button Press Logic ============
+      - conditions:
+          - "{{ trigger_data.cluster_id == 6 }}"
+          - "{{ trigger_data.command in ['on', 'off'] }}"
+        sequence:
+          - service: input_datetime.set_datetime
+            data:
+              entity_id: input_datetime.scene_control_hold_start
+              timestamp: "{{ now().timestamp() }}"
+          - delay:
+              milliseconds: 800
+          - choose:
+              # If time since hold start is > 0.8s, it's a long press
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ now().timestamp() - (states('input_datetime.scene_control_hold_start') | as_datetime).timestamp() > 0.7 }}
+                sequence: !input centre_press_long_action
+              # If pressed again within 500ms, it's a double
+              - conditions:
+                  - condition: template
+                    value_template: "{{ time_since_last_press < 0.5 }}"
+                sequence: !input centre_press_double_action
+              # Otherwise, it's a single
+              - conditions:
+                  - condition: template
+                    value_template: "{{ time_since_last_press >= 0.5 }}"
+                sequence: !input centre_press_single_action
+
+          - service: input_datetime.set_datetime
+            data:
+              entity_id: input_datetime.scene_control_last_press
+              timestamp: "{{ now().timestamp() }}"
