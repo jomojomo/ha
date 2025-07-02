@@ -1,21 +1,18 @@
 blueprint:
-  name: Sunricher Dial Controller (ZHA) – Full Input Support
+  name: Sunricher Dial Controller (ZHA) – All Input Types
   description: |
-    Handles full input set from Sunricher dial (HK-ZRC-K5&RS-TL) via ZHA.
-    Supports:
-    - Single/double/long press for all 5 buttons (1–4 + centre)
-    - Dial rotation: clockwise and counter-clockwise
-
+    Complete support for Sunricher dial controller (HK-ZRC-K5&RS-TL) via ZHA.
+    - Buttons 1–4 + Centre: Single, Double, Long press
+    - Dial: Clockwise and Counter-clockwise
     Requires two helpers:
-    - input_datetime.scene_control_last_press
-    - input_datetime.scene_control_hold_start
+      - input_datetime.scene_control_last_press
+      - input_datetime.scene_control_hold_start
 
   domain: automation
 
   input:
     remote:
       name: Sunricher remote
-      description: The remote device to use for the automation
       selector:
         device:
           entity:
@@ -63,93 +60,95 @@ trigger:
     event_type: zha_event
 
 variables:
-  # Timing thresholds
   double_press_window: 0.5
   long_press_threshold: 0.7
-
-  # Track values
   trigger_data: "{{ trigger.event.data }}"
   now_ts: "{{ now().timestamp() }}"
   last_press_ts: >
-    {{ (states('input_datetime.scene_control_last_press') | as_datetime).timestamp()
-       if states('input_datetime.scene_control_last_press') not in ['unknown', 'unavailable'] else 0 }}
+    {% set dt = states('input_datetime.scene_control_last_press') | as_datetime %}
+    {{ dt.timestamp() if dt else 0 }}
   time_since_last_press: "{{ now_ts - last_press_ts }}"
-
-  # Button map (scene_id)
-  button_map:
-    "0": "button_1"
-    "1": "button_2"
-    "2": "button_3"
-    "3": "button_4"
-    "centre": "centre"
-
-condition:
-  - condition: template
-    value_template: "{{ trigger.event.data.device_id == device_attr(input.remote, 'id') }}"
+  button_key: >
+    {% if trigger_data.cluster_id == 5 %}
+      {% set map = { '0': 'button_1', '1': 'button_2', '2': 'button_3', '3': 'button_4' } %}
+      {{ map[trigger_data.params.scene_id | string] }}
+    {% elif trigger_data.cluster_id == 6 %}
+      centre
+    {% else %}
+      unknown
+    {% endif %}
 
 action:
   - choose:
-      # =============== BUTTON PRESSES (1–4 + Centre) ===============
+      # ================= BUTTON PRESSES =================
       - conditions:
           - condition: template
             value_template: >
-              {{
-                (trigger_data.cluster_id == 5 and trigger_data.command == 'recall') or
-                (trigger_data.cluster_id == 6 and trigger_data.command in ['on', 'off'])
-              }}
+              {{ button_key in ['button_1', 'button_2', 'button_3', 'button_4', 'centre'] }}
         sequence:
-          - variables:
-              button_key: >
-                {% if trigger_data.cluster_id == 5 %}
-                  {{ button_map[trigger_data.params.scene_id | string] }}
-                {% else %}
-                  {{ button_map["centre"] }}
-                {% endif %}
-
-          # Store press start
           - service: input_datetime.set_datetime
             data:
               entity_id: input_datetime.scene_control_hold_start
               timestamp: "{{ now().timestamp() }}"
 
-          # Delay for long press detection
           - delay:
               milliseconds: 800
 
-          # Classify as long, double, or single
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: >
-                      {{ now().timestamp() - (states('input_datetime.scene_control_hold_start') | as_datetime).timestamp() > long_press_threshold }}
-                sequence:
-                  - choose:
-                      - conditions: []
-                        sequence: !input "{{ button_key }}_long"
+          - variables:
+              hold_duration: >
+                {% set dt = states('input_datetime.scene_control_hold_start') | as_datetime %}
+                {{ (now().timestamp() - dt.timestamp()) if dt else 0 }}
+              press_type: >
+                {% if hold_duration > long_press_threshold %}
+                  long
+                {% elif time_since_last_press < double_press_window %}
+                  double
+                {% else %}
+                  single
+                {% endif %}
 
-              - conditions:
-                  - condition: template
-                    value_template: "{{ time_since_last_press < double_press_window }}"
-                sequence:
-                  - choose:
-                      - conditions: []
-                        sequence: !input "{{ button_key }}_double"
-
-              - conditions:
-                  - condition: template
-                    value_template: "{{ time_since_last_press >= double_press_window }}"
-                sequence:
-                  - choose:
-                      - conditions: []
-                        sequence: !input "{{ button_key }}_single"
-
-          # Update last press timestamp
           - service: input_datetime.set_datetime
             data:
               entity_id: input_datetime.scene_control_last_press
               timestamp: "{{ now().timestamp() }}"
 
-      # =============== DIAL CLOCKWISE ===============
+          - choose:
+              - conditions: "{{ button_key == 'button_1' and press_type == 'single' }}"
+                sequence: !input button_1_single
+              - conditions: "{{ button_key == 'button_1' and press_type == 'double' }}"
+                sequence: !input button_1_double
+              - conditions: "{{ button_key == 'button_1' and press_type == 'long' }}"
+                sequence: !input button_1_long
+
+              - conditions: "{{ button_key == 'button_2' and press_type == 'single' }}"
+                sequence: !input button_2_single
+              - conditions: "{{ button_key == 'button_2' and press_type == 'double' }}"
+                sequence: !input button_2_double
+              - conditions: "{{ button_key == 'button_2' and press_type == 'long' }}"
+                sequence: !input button_2_long
+
+              - conditions: "{{ button_key == 'button_3' and press_type == 'single' }}"
+                sequence: !input button_3_single
+              - conditions: "{{ button_key == 'button_3' and press_type == 'double' }}"
+                sequence: !input button_3_double
+              - conditions: "{{ button_key == 'button_3' and press_type == 'long' }}"
+                sequence: !input button_3_long
+
+              - conditions: "{{ button_key == 'button_4' and press_type == 'single' }}"
+                sequence: !input button_4_single
+              - conditions: "{{ button_key == 'button_4' and press_type == 'double' }}"
+                sequence: !input button_4_double
+              - conditions: "{{ button_key == 'button_4' and press_type == 'long' }}"
+                sequence: !input button_4_long
+
+              - conditions: "{{ button_key == 'centre' and press_type == 'single' }}"
+                sequence: !input centre_single
+              - conditions: "{{ button_key == 'centre' and press_type == 'double' }}"
+                sequence: !input centre_double
+              - conditions: "{{ button_key == 'centre' and press_type == 'long' }}"
+                sequence: !input centre_long
+
+      # ================= DIAL ROTATION =================
       - conditions:
           - condition: template
             value_template: >
@@ -158,7 +157,6 @@ action:
                  trigger_data.params.step_mode == 0 }}
         sequence: !input dial_clockwise_action
 
-      # =============== DIAL COUNTER-CLOCKWISE ===============
       - conditions:
           - condition: template
             value_template: >
