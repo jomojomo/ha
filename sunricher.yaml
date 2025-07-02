@@ -13,10 +13,6 @@ blueprint:
         device:
           entity:
             - integration: zha
-          filter:
-            - integration: zha
-              manufacturer: Sunricher
-              model: HK-ZRC-K5&RS-TL
           multiple: false
 
     button_1_single: { name: Button 1 – Single, default: [], selector: { action: {} } }
@@ -41,10 +37,10 @@ trigger:
 
 variables:
   trigger_data: "{{ trigger.event.data }}"
+  scene_map: ['button_2', 'button_1', 'button_3', 'button_4']
   button_key: >
     {% if trigger_data.cluster_id == 5 %}
-      {% set map = { '0': 'button_1', '1': 'button_2', '2': 'button_3', '3': 'button_4' } %}
-      {{ map[trigger_data.params.scene_id | string] }}
+      {{ scene_map[trigger_data.params.scene_id] if trigger_data.params.scene_id < scene_map | length else 'unknown' }}
     {% elif trigger_data.cluster_id == 6 %}
       centre
     {% else %}
@@ -53,7 +49,6 @@ variables:
 
 action:
   - choose:
-      # Handle single button presses
       - conditions:
           - condition: template
             value_template: >
@@ -71,20 +66,16 @@ action:
               - conditions: "{{ button_key == 'centre' }}"
                 sequence: !input centre_single
 
-      # Handle dial clockwise rotation
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger_data.cluster_id == 8 and
-                 trigger_data.command == 'step_with_on_off' and
-                 trigger_data.params.step_mode == 0 }}
+              {% set d = trigger.event.data %}
+              {{ d.cluster_id == 8 and d.command == 'step_with_on_off' and d.params is defined and d.params.step_mode == 0 }}
         sequence: !input dial_clockwise_action
 
-      # Handle dial counter-clockwise rotation
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger_data.cluster_id == 8 and
-                 trigger_data.command == 'step' and
-                 trigger_data.params.step_mode == 1 }}
+              {% set d = trigger.event.data %}
+              {{ d.cluster_id == 8 and d.command == 'step' and d.params is defined and d.params.step_mode == 1 }}
         sequence: !input dial_counter_action
