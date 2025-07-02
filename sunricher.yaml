@@ -1,12 +1,8 @@
 blueprint:
-  name: Sunricher Dial Controller (ZHA) – All Input Types
+  name: Sunricher Dial Controller (ZHA) – Single Press + Dial
   description: |
-    Complete support for Sunricher dial controller (HK-ZRC-K5&RS-TL) via ZHA.
-    - Buttons 1–4 + Centre: Single, Double, Long press
-    - Dial: Clockwise and Counter-clockwise
-    Requires two helpers:
-      - input_datetime.scene_control_last_press
-      - input_datetime.scene_control_hold_start
+    Basic support for Sunricher dial controller (HK-ZRC-K5&RS-TL) via ZHA.
+    Handles single presses on buttons 1–4 + centre and dial rotations.
 
   domain: automation
 
@@ -23,28 +19,12 @@ blueprint:
               model: HK-ZRC-K5&RS-TL
           multiple: false
 
-    # Button actions
     button_1_single: { name: Button 1 – Single, default: [], selector: { action: {} } }
-    button_1_double: { name: Button 1 – Double, default: [], selector: { action: {} } }
-    button_1_long:   { name: Button 1 – Long,   default: [], selector: { action: {} } }
-
     button_2_single: { name: Button 2 – Single, default: [], selector: { action: {} } }
-    button_2_double: { name: Button 2 – Double, default: [], selector: { action: {} } }
-    button_2_long:   { name: Button 2 – Long,   default: [], selector: { action: {} } }
-
     button_3_single: { name: Button 3 – Single, default: [], selector: { action: {} } }
-    button_3_double: { name: Button 3 – Double, default: [], selector: { action: {} } }
-    button_3_long:   { name: Button 3 – Long,   default: [], selector: { action: {} } }
-
     button_4_single: { name: Button 4 – Single, default: [], selector: { action: {} } }
-    button_4_double: { name: Button 4 – Double, default: [], selector: { action: {} } }
-    button_4_long:   { name: Button 4 – Long,   default: [], selector: { action: {} } }
-
     centre_single:   { name: Centre – Single, default: [], selector: { action: {} } }
-    centre_double:   { name: Centre – Double, default: [], selector: { action: {} } }
-    centre_long:     { name: Centre – Long,   default: [], selector: { action: {} } }
 
-    # Dial actions
     dial_clockwise_action:
       name: Dial – Clockwise
       default: []
@@ -60,14 +40,7 @@ trigger:
     event_type: zha_event
 
 variables:
-  double_press_window: 0.5
-  long_press_threshold: 0.7
   trigger_data: "{{ trigger.event.data }}"
-  now_ts: "{{ now().timestamp() }}"
-  last_press_ts: >
-    {% set dt = states('input_datetime.scene_control_last_press') | as_datetime %}
-    {{ dt.timestamp() if dt else 0 }}
-  time_since_last_press: "{{ now_ts - last_press_ts }}"
   button_key: >
     {% if trigger_data.cluster_id == 5 %}
       {% set map = { '0': 'button_1', '1': 'button_2', '2': 'button_3', '3': 'button_4' } %}
@@ -80,75 +53,25 @@ variables:
 
 action:
   - choose:
-      # ================= BUTTON PRESSES =================
+      # Handle single button presses
       - conditions:
           - condition: template
             value_template: >
               {{ button_key in ['button_1', 'button_2', 'button_3', 'button_4', 'centre'] }}
         sequence:
-          - service: input_datetime.set_datetime
-            data:
-              entity_id: input_datetime.scene_control_hold_start
-              timestamp: "{{ now().timestamp() }}"
-
-          - delay:
-              milliseconds: 800
-
-          - variables:
-              hold_duration: >
-                {% set dt = states('input_datetime.scene_control_hold_start') | as_datetime %}
-                {{ (now().timestamp() - dt.timestamp()) if dt else 0 }}
-              press_type: >
-                {% if hold_duration > long_press_threshold %}
-                  long
-                {% elif time_since_last_press < double_press_window %}
-                  double
-                {% else %}
-                  single
-                {% endif %}
-
-          - service: input_datetime.set_datetime
-            data:
-              entity_id: input_datetime.scene_control_last_press
-              timestamp: "{{ now().timestamp() }}"
-
           - choose:
-              - conditions: "{{ button_key == 'button_1' and press_type == 'single' }}"
+              - conditions: "{{ button_key == 'button_1' }}"
                 sequence: !input button_1_single
-              - conditions: "{{ button_key == 'button_1' and press_type == 'double' }}"
-                sequence: !input button_1_double
-              - conditions: "{{ button_key == 'button_1' and press_type == 'long' }}"
-                sequence: !input button_1_long
-
-              - conditions: "{{ button_key == 'button_2' and press_type == 'single' }}"
+              - conditions: "{{ button_key == 'button_2' }}"
                 sequence: !input button_2_single
-              - conditions: "{{ button_key == 'button_2' and press_type == 'double' }}"
-                sequence: !input button_2_double
-              - conditions: "{{ button_key == 'button_2' and press_type == 'long' }}"
-                sequence: !input button_2_long
-
-              - conditions: "{{ button_key == 'button_3' and press_type == 'single' }}"
+              - conditions: "{{ button_key == 'button_3' }}"
                 sequence: !input button_3_single
-              - conditions: "{{ button_key == 'button_3' and press_type == 'double' }}"
-                sequence: !input button_3_double
-              - conditions: "{{ button_key == 'button_3' and press_type == 'long' }}"
-                sequence: !input button_3_long
-
-              - conditions: "{{ button_key == 'button_4' and press_type == 'single' }}"
+              - conditions: "{{ button_key == 'button_4' }}"
                 sequence: !input button_4_single
-              - conditions: "{{ button_key == 'button_4' and press_type == 'double' }}"
-                sequence: !input button_4_double
-              - conditions: "{{ button_key == 'button_4' and press_type == 'long' }}"
-                sequence: !input button_4_long
-
-              - conditions: "{{ button_key == 'centre' and press_type == 'single' }}"
+              - conditions: "{{ button_key == 'centre' }}"
                 sequence: !input centre_single
-              - conditions: "{{ button_key == 'centre' and press_type == 'double' }}"
-                sequence: !input centre_double
-              - conditions: "{{ button_key == 'centre' and press_type == 'long' }}"
-                sequence: !input centre_long
 
-      # ================= DIAL ROTATION =================
+      # Handle dial clockwise rotation
       - conditions:
           - condition: template
             value_template: >
@@ -157,6 +80,7 @@ action:
                  trigger_data.params.step_mode == 0 }}
         sequence: !input dial_clockwise_action
 
+      # Handle dial counter-clockwise rotation
       - conditions:
           - condition: template
             value_template: >
