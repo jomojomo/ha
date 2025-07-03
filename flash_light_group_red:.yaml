@@ -1,0 +1,30 @@
+flash_light_group_red:
+  alias: Flash Light Group Red
+  description: Temporarily flash a light group red and restore original state.
+  mode: parallel
+  fields:
+    target_light:
+      name: Light group
+      description: The light or light group entity ID to flash
+      required: true
+      selector:
+        entity:
+          domain: light
+
+  sequence:
+    - variables:
+        rgb: "{{ state_attr(target_light, 'rgb_color') }}"
+        brightness: "{{ state_attr(target_light, 'brightness') }}"
+    - service: light.turn_on
+      data:
+        entity_id: "{{ target_light }}"
+        rgb_color: [255, 0, 0]
+        brightness: 255
+        transition: 0.1
+    - delay: "00:00:01"
+    - service: light.turn_on
+      data:
+        entity_id: "{{ target_light }}"
+        rgb_color: "{{ rgb if rgb else [255,255,255] }}"
+        brightness: "{{ brightness if brightness else 255 }}"
+        transition: 0.2
