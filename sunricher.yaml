@@ -1,6 +1,6 @@
 blueprint:
   name: Sunricher Dial Controller (ZHA) – Single & Double Press + Dial
-  description: |
+  description: >
     Support for Sunricher dial controller (HK-ZRC-K5&RS-TL) via ZHA.
     Handles single & double presses on buttons 1–4 + centre and dial rotations.
 
@@ -43,7 +43,6 @@ blueprint:
 trigger:
   - platform: event
     event_type: zha_event
-  # This automation triggers on every zha_event from the remote
 
 variables:
   trigger_data: "{{ trigger.event.data }}"
@@ -59,54 +58,90 @@ variables:
 
 action:
   - choose:
-      # Handle buttons (single or double press)
+      # Handle button presses
       - conditions:
           - condition: template
             value_template: >
               {{ button_key in ['button_1', 'button_2', 'button_3', 'button_4', 'centre'] }}
         sequence:
+          - delay: '00:00:00.3'
           - wait_for_trigger:
               - platform: event
                 event_type: zha_event
-                # wait for the *same* button press again within 400ms for double press detection
                 event_data:
                   device_ieee: "{{ trigger_data.device_ieee }}"
                   cluster_id: "{{ trigger_data.cluster_id }}"
                   command: "{{ trigger_data.command }}"
                   params: "{{ trigger_data.params }}"
-            timeout: '00:00:00.4'
+            timeout: '00:00:00.7'
             continue_on_timeout: true
 
           - choose:
-              # If a second press detected (wait_for_trigger returned), do double press
+              # Double press detected
               - conditions:
                   - condition: template
                     value_template: "{{ wait.trigger is not none }}"
                 sequence:
                   - choose:
-                      - conditions: "{{ button_key == 'button_1' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_1' }}"
                         sequence: !input button_1_double
-                      - conditions: "{{ button_key == 'button_2' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_2' }}"
                         sequence: !input button_2_double
-                      - conditions: "{{ button_key == 'button_3' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_3' }}"
                         sequence: !input button_3_double
-                      - conditions: "{{ button_key == 'button_4' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_4' }}"
                         sequence: !input button_4_double
-                      - conditions: "{{ button_key == 'centre' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'centre' }}"
                         sequence: !input centre_double
 
-              # Else single press action
-              - default:
+              # Else single press – with extra safeguard
+              - conditions:
+                  - condition: template
+                    value_template: "{{ wait.trigger is none }}"
+                sequence:
+                  - delay: "00:00:00.4"
+                  - wait_for_trigger:
+                      - platform: event
+                        event_type: zha_event
+                        event_data:
+                          device_ieee: "{{ trigger_data.device_ieee }}"
+                          cluster_id: "{{ trigger_data.cluster_id }}"
+                          command: "{{ trigger_data.command }}"
+                          params: "{{ trigger_data.params }}"
+                    timeout: "00:00:00.3"
+                    continue_on_timeout: true
+                  - condition: template
+                    value_template: "{{ wait.trigger is none }}"
                   - choose:
-                      - conditions: "{{ button_key == 'button_1' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_1' }}"
                         sequence: !input button_1_single
-                      - conditions: "{{ button_key == 'button_2' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_2' }}"
                         sequence: !input button_2_single
-                      - conditions: "{{ button_key == 'button_3' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_3' }}"
                         sequence: !input button_3_single
-                      - conditions: "{{ button_key == 'button_4' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'button_4' }}"
                         sequence: !input button_4_single
-                      - conditions: "{{ button_key == 'centre' }}"
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ button_key == 'centre' }}"
                         sequence: !input centre_single
 
       # Handle dial clockwise rotation
