@@ -53,7 +53,7 @@ variables:
   scene_map: ['button_1', 'button_2', 'button_3', 'button_4']
   button_key: >
     {% if trigger_data.cluster_id == 5 %}
-      {{ scene_map[trigger_data.params.scene_id] if trigger_data.params.scene_id < scene_map | length else 'unknown' }}
+      {{ scene_map[trigger_data.params.scene_id - 1] if (trigger_data.params.scene_id - 1) < scene_map | length else 'unknown' }}
     {% elif trigger_data.cluster_id == 6 %}
       centre
     {% else %}
