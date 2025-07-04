@@ -13,7 +13,9 @@ flash_light_group_red:
 
   sequence:
     - variables:
+        mode: "{{ state_attr(target_light, 'color_mode') }}"
         rgb: "{{ state_attr(target_light, 'rgb_color') }}"
+        temp: "{{ state_attr(target_light, 'color_temp') }}"
         brightness: "{{ state_attr(target_light, 'brightness') }}"
     - service: light.turn_on
       data:
@@ -22,9 +24,24 @@ flash_light_group_red:
         brightness: 255
         transition: 0.1
     - delay: "00:00:01"
-    - service: light.turn_on
-      data:
-        entity_id: "{{ target_light }}"
-        rgb_color: "{{ rgb if rgb else [255,255,255] }}"
-        brightness: "{{ brightness if brightness else 255 }}"
-        transition: 0.2
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ mode == 'color_temp' }}"
+          sequence:
+            - service: light.turn_on
+              data:
+                entity_id: "{{ target_light }}"
+                color_temp: "{{ temp }}"
+                brightness: "{{ brightness | int }}"
+                transition: 0.2
+        - conditions:
+            - condition: template
+              value_template: "{{ mode in ['rgb', 'rgb_color'] }}"
+          sequence:
+            - service: light.turn_on
+              data:
+                entity_id: "{{ target_light }}"
+                rgb_color: "{{ rgb }}"
+                brightness: "{{ brightness | int }}"
+                transition: 0.2
