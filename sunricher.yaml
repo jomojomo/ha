@@ -87,11 +87,11 @@ action:
                     value_template: "{{ button_key == 'button_4' }}"
                 sequence: !input button_4_long
 
-      # Handle single/double press (command: recall)
+      # Handle single/double press (command: recall, on, off)
       - conditions:
           - condition: template
             value_template: >
-              {{ trigger_data.command == 'recall' and button_key in ['button_1', 'button_2', 'button_3', 'button_4', 'centre'] }}
+              {{ trigger_data.command in ['recall', 'on', 'off'] and button_key in ['button_1', 'button_2', 'button_3', 'button_4', 'centre'] }}
         sequence:
           - delay: '00:00:00.3'
 
