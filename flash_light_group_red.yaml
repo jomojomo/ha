@@ -13,6 +13,7 @@ flash_light_group_red:
 
   sequence:
     - variables:
+        light_state: "{{ states(target_light) }}"
         mode: "{{ state_attr(target_light, 'color_mode') }}"
         rgb: "{{ state_attr(target_light, 'rgb_color') }}"
         temp: "{{ state_attr(target_light, 'color_temp') }}"
@@ -25,9 +26,40 @@ flash_light_group_red:
         transition: 0.1
     - delay: "00:00:01"
     - choose:
+        # If the light was originally off, restore color, then turn off
         - conditions:
             - condition: template
-              value_template: "{{ mode == 'color_temp' }}"
+              value_template: "{{ light_state == 'off' }}"
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: "{{ mode == 'color_temp' }}"
+                  sequence:
+                    - service: light.turn_on
+                      data:
+                        entity_id: "{{ target_light }}"
+                        color_temp: "{{ temp }}"
+                        brightness: "{{ brightness | int }}"
+                        transition: 0.2
+                - conditions:
+                    - condition: template
+                      value_template: "{{ mode in ['rgb', 'rgb_color'] }}"
+                  sequence:
+                    - service: light.turn_on
+                      data:
+                        entity_id: "{{ target_light }}"
+                        rgb_color: "{{ rgb }}"
+                        brightness: "{{ brightness | int }}"
+                        transition: 0.2
+            - delay: "00:00:00.3"
+            - service: light.turn_off
+              data:
+                entity_id: "{{ target_light }}"
+        # If the light was on, just restore it
+        - conditions:
+            - condition: template
+              value_template: "{{ light_state == 'on' and mode == 'color_temp' }}"
           sequence:
             - service: light.turn_on
               data:
@@ -37,7 +69,7 @@ flash_light_group_red:
                 transition: 0.2
         - conditions:
             - condition: template
-              value_template: "{{ mode in ['rgb', 'rgb_color'] }}"
+              value_template: "{{ light_state == 'on' and mode in ['rgb', 'rgb_color'] }}"
           sequence:
             - service: light.turn_on
               data:
