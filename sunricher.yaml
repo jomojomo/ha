@@ -65,7 +65,7 @@ variables:
 
 condition:
   - condition: template
-    value_template: "{{ trigger_data.device_ieee == remote_ieee }}"
+    value_template: "{{ trigger.event.data.device_ieee == remote_ieee }}"
 
 action:
   - choose:
